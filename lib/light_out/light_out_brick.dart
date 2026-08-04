@@ -1,30 +1,23 @@
 import 'package:flutter/material.dart';
 
-class LightOutBrick extends StatefulWidget {
-  final int x;
-  final int y;
+class LightOutBrick extends StatelessWidget {
+  final bool isLightOn;
+  final VoidCallback onTap;
 
-  const LightOutBrick({super.key, required this.x, required this.y});
-
-  @override
-  State<LightOutBrick> createState() => _LightOutBrickState();
-}
-
-class _LightOutBrickState extends State<LightOutBrick> {
-  bool _lightOn = false;
+  const LightOutBrick({
+    super.key,
+    required this.isLightOn,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    late final Color color;
-    if (_lightOn) {
-      color = Color(0xFFFFE306);
-    } else {
-      color = Colors.black;
-    }
+    final Color color = isLightOn ? const Color(0xFFFFE306) : Colors.black;
+
     return Container(
       color: color,
       child: OutlinedButton(
-        onPressed: changeState,
+        onPressed: onTap,
         style: OutlinedButton.styleFrom(
           padding: EdgeInsets.zero,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
@@ -32,11 +25,5 @@ class _LightOutBrickState extends State<LightOutBrick> {
         child: Container(),
       ),
     );
-  }
-
-  void changeState() {
-    setState(() {
-      _lightOn = !_lightOn;
-    });
   }
 }

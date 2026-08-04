@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:games/light_out/light_out_brick.dart';
 import 'package:games/light_out/light_out_grid.dart';
 
 void main() {
