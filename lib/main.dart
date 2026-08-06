@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:games/light_out/light_out_grid.dart';
+import 'package:games/menu_page.dart';
 
 void main() {
   runApp(const MainApp());
@@ -12,7 +12,9 @@ class MainApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return const MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: Scaffold(body: Center(child: LightOutGrid())),
+      home: Scaffold(
+        body: SafeArea(child: Center(child: MenuPage())),
+      ),
     );
   }
 }
