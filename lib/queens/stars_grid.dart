@@ -64,6 +64,7 @@ class _StarsGridState extends State<StarsGrid> {
     if (_isGenerating) return;
     if (gridSize < zoneColors.length) {
       gridSize++;
+      _generationId = 0;
       _startNewGame();
     }
   }
@@ -72,6 +73,7 @@ class _StarsGridState extends State<StarsGrid> {
     if (_isGenerating) return;
     if (gridSize > 4) {
       gridSize--;
+      _generationId = 0;
       _startNewGame();
     }
   }
@@ -98,32 +100,40 @@ class _StarsGridState extends State<StarsGrid> {
     while (changed) {
       if (_generationId != currentGen) return;
 
-      changed = false;
-      // Mélanger l'ordre d'expansion pour que les zones grandissent de façon équilibrée
-      List<int> zOrder = List.generate(size, (i) => i)..shuffle(random);
-
-      for (int z in zOrder) {
+      // 1. Déterminer quelles zones peuvent encore grandir
+      List<int> activeZones = [];
+      for (int z = 0; z < size; z++) {
         // Nettoyer la frontière des cases déjà assignées
         frontiers[z].removeWhere((p) => _zones[p[0]][p[1]] != -1);
-        if (frontiers[z].isEmpty) continue;
 
-        // Choix du prochain pixel en fonction de la difficulté
-        double stretchProb = difficulty / 100.0;
-        int index =
-            0; // Par défaut : comportement BFS (Compact, proche de l'étoile)
-
-        if (random.nextDouble() < stretchProb) {
-          // Comportement DFS ou Aléatoire : Allongement de la zone
-          index = random.nextBool()
-              ? frontiers[z].length - 1
-              : random.nextInt(frontiers[z].length);
+        if (frontiers[z].isNotEmpty) {
+          activeZones.add(z);
         }
-
-        var p = frontiers[z].removeAt(index);
-        _zones[p[0]][p[1]] = z;
-        _addNeighborsToFrontier(p[0], p[1], size, frontiers[z]);
-        changed = true;
       }
+
+      // 2. Si plus aucune zone ne peut grandir, la grille est pleine
+      if (activeZones.isEmpty) {
+        changed = false;
+        break;
+      }
+
+      // 3. Choisir UNE zone au hasard parmi celles actives
+      int z = activeZones[random.nextInt(activeZones.length)];
+
+      // 4. Choix du prochain pixel pour cette zone
+      double stretchProb = difficulty / 100.0;
+      int index = 0; // Par défaut : BFS (Compact)
+
+      if (random.nextDouble() < stretchProb) {
+        // Allongement de la zone (DFS ou Aléatoire)
+        index = random.nextBool()
+            ? frontiers[z].length - 1
+            : random.nextInt(frontiers[z].length);
+      }
+
+      var p = frontiers[z].removeAt(index);
+      _zones[p[0]][p[1]] = z;
+      _addNeighborsToFrontier(p[0], p[1], size, frontiers[z]);
 
       setState(() {});
     }

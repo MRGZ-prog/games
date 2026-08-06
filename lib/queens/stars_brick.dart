@@ -16,6 +16,7 @@ class StarsBrick extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isStar = status.name == "star";
     final icon = status.name == "tick"
         ? Icons.close
         : status.name == "star"
@@ -31,7 +32,16 @@ class StarsBrick extends StatelessWidget {
           minimumSize: Size.zero,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
         ),
-        child: FittedBox(child: Icon(icon)),
+        child: FittedBox(
+          child: Icon(
+            icon,
+            color: isStar ? Colors.white : Colors.black,
+            size: isStar ? 40 : 20,
+            shadows: isStar
+                ? [Shadow(color: Colors.black, offset: Offset(1, 1))]
+                : [],
+          ),
+        ),
       ),
     );
   }
