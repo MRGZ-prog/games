@@ -30,14 +30,15 @@ class _StarsGridState extends State<StarsGrid> {
     Colors.green,
     Colors.orangeAccent,
     Colors.purpleAccent,
-    Colors.tealAccent,
     Colors.pinkAccent,
-    Colors.white,
     Colors.yellow,
+    Colors.grey,
     Colors.deepOrangeAccent,
     Colors.indigoAccent,
     Colors.lightGreenAccent,
+    Colors.tealAccent,
     Colors.black,
+    Colors.white,
   ];
 
   @override
@@ -81,12 +82,9 @@ class _StarsGridState extends State<StarsGrid> {
   Future<void> _generateZonesAsync(int currentGen) async {
     Random random = Random();
     int size = gridSize;
-
-    // Frontières pour chaque zone (les cases voisines disponibles)
     List<List<List<int>>> frontiers = List.generate(size, (_) => []);
 
     int zoneId = 0;
-    // 1. Initialiser les zones autour des étoiles
     for (int r = 0; r < size; r++) {
       for (int c = 0; c < size; c++) {
         if (_grid[r][c] == StatusBrick.star) {
@@ -96,36 +94,24 @@ class _StarsGridState extends State<StarsGrid> {
         }
       }
     }
-    bool changed = true;
-    while (changed) {
+
+    // --- PHASE 1 : CROISSANCE INITIALE DES ZONES ---
+    while (true) {
       if (_generationId != currentGen) return;
 
-      // 1. Déterminer quelles zones peuvent encore grandir
       List<int> activeZones = [];
       for (int z = 0; z < size; z++) {
-        // Nettoyer la frontière des cases déjà assignées
         frontiers[z].removeWhere((p) => _zones[p[0]][p[1]] != -1);
-
-        if (frontiers[z].isNotEmpty) {
-          activeZones.add(z);
-        }
+        if (frontiers[z].isNotEmpty) activeZones.add(z);
       }
 
-      // 2. Si plus aucune zone ne peut grandir, la grille est pleine
-      if (activeZones.isEmpty) {
-        changed = false;
-        break;
-      }
+      if (activeZones.isEmpty) break;
 
-      // 3. Choisir UNE zone au hasard parmi celles actives
       int z = activeZones[random.nextInt(activeZones.length)];
 
-      // 4. Choix du prochain pixel pour cette zone
       double stretchProb = difficulty / 100.0;
-      int index = 0; // Par défaut : BFS (Compact)
-
+      int index = 0;
       if (random.nextDouble() < stretchProb) {
-        // Allongement de la zone (DFS ou Aléatoire)
         index = random.nextBool()
             ? frontiers[z].length - 1
             : random.nextInt(frontiers[z].length);
@@ -134,53 +120,200 @@ class _StarsGridState extends State<StarsGrid> {
       var p = frontiers[z].removeAt(index);
       _zones[p[0]][p[1]] = z;
       _addNeighborsToFrontier(p[0], p[1], size, frontiers[z]);
-
-      setState(() {});
     }
 
-    if (_generationId != currentGen) return;
+    // --- PHASE 2 : VALIDATION ET MUTATION ---
+    bool success = false;
+    int maxMutations = 50;
+    int level = 1;
 
-    int solutions = _countSolutions(_zones, size);
+    for (int m = 0; m < maxMutations; m++) {
+      if (_generationId != currentGen) return;
 
-    if (solutions == 0 || solutions > 2) {
-      // S'il y a 0 ou plusieurs solutions, on recommence tout
+      int solutions = _countSolutions(_zones, size);
+
+      if (solutions == 1) {
+        // Vérifie la logique humaine
+        HumanSolver solver = HumanSolver(size: size, zones: _zones);
+        HumanSolverResult result = solver.solve();
+
+        if (result.isSolvable) {
+          success = true;
+          level = result.difficultyLevel;
+          break; // VICTOIRE ! On sort de la boucle de mutation
+        }
+      }
+
+      // Si on arrive ici : Soit trop de solutions, soit pas résoluble par la logique.
+      // On MUTE la grille !
+      bool mutated = _mutateZones(_zones, _grid, random, size);
+
+      if (!mutated) {
+        break; // On ne peut plus rien muter sans briser la grille
+      }
+    }
+
+    if (!success) {
+      // Si même après 50 mutations on n'y arrive pas, on recommence de 0.
+      // Cela arrivera beaucoup moins souvent qu'avant !
       if (_generationId == currentGen) {
         _startNewGame();
       }
       return;
     }
 
-    HumanSolver solver = HumanSolver(size: size, zones: _zones);
-    HumanSolverResult result = solver.solve();
+    // --- PHASE 3 : AFFICHAGE AU JOUEUR ---
+    if (_generationId != currentGen) return;
 
-    if (!result.isSolvable) {
-      if (_generationId < 1000) {
-        await Future.delayed(Duration(microseconds: 10));
-      } else if (_generationId < 100000 && _generationId % 1000 == 0) {
-        await Future.delayed(Duration(milliseconds: 50));
-      } else if (_generationId > 100000 && _generationId % 10000 == 0) {
-        await Future.delayed(Duration(milliseconds: 50));
-      }
-      // Le puzzle nécessite de deviner/faire des essais-erreurs -> Recommencer !
-      _startNewGame();
-      return;
-    }
-
-    // 2. Nettoyer les étoiles pour laisser le joueur jouer
     setState(() {
       for (int r = 0; r < size; r++) {
         for (int c = 0; c < size; c++) {
-          _grid[r][c] = StatusBrick.empty;
+          _grid[r][c] = StatusBrick.empty; // Cacher les étoiles
         }
       }
-      final difficultyText = result.difficultyLevel == 1
+      final difficultyText = level == 1
           ? "Easy"
-          : result.difficultyLevel == 2
+          : level == 2
           ? "Normal"
           : "Hard";
       status = "[$difficultyText] Find the solution (gen #$_generationId)";
       _isGenerating = false;
     });
+  }
+
+  /// Tente de muter la grille. Retourne `true` si une mutation a été faite, `false` sinon.
+  bool _mutateZones(
+    List<List<int>> tempZones,
+    List<List<StatusBrick>> currentGrid,
+    Random random,
+    int size,
+  ) {
+    // 1. Trouver toutes les cases "frontières" candidates
+    List<List<int>> candidates = [];
+
+    for (int r = 0; r < size; r++) {
+      for (int c = 0; c < size; c++) {
+        // Règle 1 : Ne JAMAIS muter une case contenant une étoile !
+        if (currentGrid[r][c] == StatusBrick.star) continue;
+
+        int currentZone = tempZones[r][c];
+
+        // Regarder les zones voisines orthogonales
+        Set<int> neighborZones = {};
+        final dirs = [
+          [-1, 0],
+          [1, 0],
+          [0, -1],
+          [0, 1],
+        ];
+        for (var d in dirs) {
+          int nr = r + d[0];
+          int nc = c + d[1];
+          if (nr >= 0 && nr < size && nc >= 0 && nc < size) {
+            if (tempZones[nr][nc] != currentZone) {
+              neighborZones.add(tempZones[nr][nc]);
+            }
+          }
+        }
+
+        // Si elle touche au moins une autre zone, c'est une candidate
+        if (neighborZones.isNotEmpty) {
+          // Format : [row, col, neighbor_zone_1, neighbor_zone_2...]
+          candidates.add([r, c, ...neighborZones.toList()]);
+        }
+      }
+    }
+
+    // 2. Mélanger pour ne pas toujours muter le même coin
+    candidates.shuffle(random);
+
+    // 3. Essayer les mutations
+    for (var candidate in candidates) {
+      int r = candidate[0];
+      int c = candidate[1];
+      int currentZone = tempZones[r][c];
+
+      // Règle 2 : S'assurer que si on enlève cette case, la zone reste un seul bloc continu
+      if (_isZoneContiguousWithout(tempZones, currentZone, r, c, size)) {
+        // Choisir une des zones voisines au hasard
+        List<int> possibleNewZones = candidate.sublist(2);
+        int newZone = possibleNewZones[random.nextInt(possibleNewZones.length)];
+
+        // Appliquer la mutation
+        tempZones[r][c] = newZone;
+        return true;
+      }
+    }
+
+    return false; // Impossible de muter
+  }
+
+  /// Vérifie par un algorithme de Flood-Fill (BFS) si la zone reste d'un seul bloc
+  /// si on ignore la case (skipR, skipC).
+  bool _isZoneContiguousWithout(
+    List<List<int>> tempZones,
+    int zoneId,
+    int skipR,
+    int skipC,
+    int size,
+  ) {
+    int startR = -1, startC = -1;
+    int totalCells = 0;
+
+    // Compter les cases et trouver une case de départ (qui n'est pas la case à ignorer)
+    for (int r = 0; r < size; r++) {
+      for (int c = 0; c < size; c++) {
+        if (tempZones[r][c] == zoneId && (r != skipR || c != skipC)) {
+          totalCells++;
+          if (startR == -1) {
+            startR = r;
+            startC = c;
+          }
+        }
+      }
+    }
+
+    if (totalCells == 0) return true;
+
+    // Parcours (BFS) pour compter les cases connectées
+    List<List<int>> queue = [
+      [startR, startC],
+    ];
+    List<List<bool>> visited = List.generate(
+      size,
+      (_) => List.filled(size, false),
+    );
+    visited[startR][startC] = true;
+    int visitedCount = 1;
+
+    int head = 0;
+    final dirs = [
+      [-1, 0],
+      [1, 0],
+      [0, -1],
+      [0, 1],
+    ];
+
+    while (head < queue.length) {
+      var curr = queue[head++];
+      for (var d in dirs) {
+        int nr = curr[0] + d[0];
+        int nc = curr[1] + d[1];
+        if (nr >= 0 && nr < size && nc >= 0 && nc < size) {
+          // Si c'est notre zone, non visitée, et PAS la case qu'on est en train d'enlever
+          if (!visited[nr][nc] &&
+              tempZones[nr][nc] == zoneId &&
+              (nr != skipR || nc != skipC)) {
+            visited[nr][nc] = true;
+            visitedCount++;
+            queue.add([nr, nc]);
+          }
+        }
+      }
+    }
+
+    // Si on a visité autant de cases que le total, la zone n'a pas été brisée
+    return visitedCount == totalCells;
   }
 
   void _addNeighborsToFrontier(
