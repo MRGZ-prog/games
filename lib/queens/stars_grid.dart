@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:games/queens/stars_brick.dart';
+import 'package:games/queens/stars_solver.dart';
 
 class StarsGrid extends StatefulWidget {
   final int initGridSize;
@@ -26,16 +27,17 @@ class _StarsGridState extends State<StarsGrid> {
   static const List<Color> zoneColors = [
     Colors.redAccent,
     Colors.blueAccent,
-    Colors.greenAccent,
+    Colors.green,
     Colors.orangeAccent,
     Colors.purpleAccent,
     Colors.tealAccent,
     Colors.pinkAccent,
-    Colors.amberAccent,
-    Colors.cyanAccent,
+    Colors.white,
+    Colors.yellow,
     Colors.deepOrangeAccent,
     Colors.indigoAccent,
     Colors.lightGreenAccent,
+    Colors.black,
   ];
 
   @override
@@ -51,6 +53,7 @@ class _StarsGridState extends State<StarsGrid> {
     setState(() {
       _grid = createPuzzle(gridSize, difficulty);
       _zones = List.generate(gridSize, (_) => List.filled(gridSize, -1));
+      status = "Generating... attempt $_generationId";
       _isGenerating = true;
     });
 
@@ -59,7 +62,7 @@ class _StarsGridState extends State<StarsGrid> {
 
   void _biggerSize() {
     if (_isGenerating) return;
-    if (gridSize < 12) {
+    if (gridSize < zoneColors.length) {
       gridSize++;
       _startNewGame();
     }
@@ -67,7 +70,7 @@ class _StarsGridState extends State<StarsGrid> {
 
   void _smallerSize() {
     if (_isGenerating) return;
-    if (gridSize > 1) {
+    if (gridSize > 4) {
       gridSize--;
       _startNewGame();
     }
@@ -93,9 +96,7 @@ class _StarsGridState extends State<StarsGrid> {
     }
     bool changed = true;
     while (changed) {
-      if (_generationId != currentGen) {
-        return; // Stoppe si une autre partie a été lancée
-      }
+      if (_generationId != currentGen) return;
 
       changed = false;
       // Mélanger l'ordre d'expansion pour que les zones grandissent de façon équilibrée
@@ -128,6 +129,26 @@ class _StarsGridState extends State<StarsGrid> {
     }
 
     if (_generationId != currentGen) return;
+
+    int solutions = _countSolutions(_zones, size);
+
+    if (solutions == 0 || solutions > 2) {
+      // S'il y a 0 ou plusieurs solutions, on recommence tout
+      if (_generationId == currentGen) {
+        _startNewGame();
+      }
+      return;
+    }
+
+    HumanSolver solver = HumanSolver(size: size, zones: _zones);
+    HumanSolverResult result = solver.solve();
+
+    if (!result.isSolvable) {
+      await Future.delayed(Duration(microseconds: 1));
+      // Le puzzle nécessite de deviner/faire des essais-erreurs -> Recommencer !
+      _startNewGame();
+      return;
+    }
 
     // 2. Nettoyer les étoiles pour laisser le joueur jouer
     setState(() {
@@ -298,6 +319,69 @@ class _StarsGridState extends State<StarsGrid> {
     }
 
     status = "Victory";
+  }
+
+  int _countSolutions(List<List<int>> zones, int size) {
+    int solutionsCount = 0;
+    List<bool> colsOccupied = List.filled(size, false);
+    List<bool> zonesOccupied = List.filled(size, false);
+    List<List<bool>> stars = List.generate(
+      size,
+      (_) => List.filled(size, false),
+    );
+
+    // Fonction récursive interne pour tester les lignes une par une
+    void solve(int row) {
+      if (solutionsCount > 1)
+        return; // Optimisation : on s'arrête si on a déjà trouvé plusieurs solutions
+
+      if (row == size) {
+        solutionsCount++;
+        return;
+      }
+
+      for (int col = 0; col < size; col++) {
+        int zoneId = zones[row][col];
+
+        // Vérifier si la colonne ou la zone est déjà occupée
+        if (colsOccupied[col] || zonesOccupied[zoneId]) continue;
+
+        // Vérifier les 8 cases autour (seulement celles au-dessus et à gauche car on remplit de haut en bas)
+        bool hasAdjacentStar = false;
+        final List<List<int>> directions = [
+          [-1, -1],
+          [-1, 0],
+          [-1, 1],
+          [0, -1],
+        ];
+        for (var dir in directions) {
+          int r = row + dir[0];
+          int c = col + dir[1];
+          if (r >= 0 && r < size && c >= 0 && c < size) {
+            if (stars[r][c]) {
+              hasAdjacentStar = true;
+              break;
+            }
+          }
+        }
+        if (hasAdjacentStar) continue;
+
+        // Placer une étoile pour tester
+        stars[row][col] = true;
+        colsOccupied[col] = true;
+        zonesOccupied[zoneId] = true;
+
+        solve(row + 1); // Tester la ligne suivante
+
+        // Backtracking : retirer l'étoile
+        stars[row][col] = false;
+        colsOccupied[col] = false;
+        zonesOccupied[zoneId] = false;
+      }
+    }
+
+    solve(0);
+    return solutionsCount;
   }
 
   void _onBrickTapped(int x, int y) {
