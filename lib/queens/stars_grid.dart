@@ -144,7 +144,13 @@ class _StarsGridState extends State<StarsGrid> {
     HumanSolverResult result = solver.solve();
 
     if (!result.isSolvable) {
-      await Future.delayed(Duration(microseconds: 1));
+      if (_generationId < 1000) {
+        await Future.delayed(Duration(microseconds: 10));
+      } else if (_generationId < 100000 && _generationId % 1000 == 0) {
+        await Future.delayed(Duration(milliseconds: 50));
+      } else if (_generationId > 100000 && _generationId % 10000 == 0) {
+        await Future.delayed(Duration(milliseconds: 50));
+      }
       // Le puzzle nécessite de deviner/faire des essais-erreurs -> Recommencer !
       _startNewGame();
       return;
@@ -157,7 +163,12 @@ class _StarsGridState extends State<StarsGrid> {
           _grid[r][c] = StatusBrick.empty;
         }
       }
-      status = "Find the solution";
+      final difficultyText = result.difficultyLevel == 1
+          ? "Easy"
+          : result.difficultyLevel == 2
+          ? "Normal"
+          : "Hard";
+      status = "[$difficultyText] Find the solution (gen #$_generationId)";
       _isGenerating = false;
     });
   }
@@ -297,7 +308,6 @@ class _StarsGridState extends State<StarsGrid> {
             int nc = c + dir[1];
             if (nr >= 0 && nr < gridSize && nc >= 0 && nc < gridSize) {
               if (_grid[nr][nc] == StatusBrick.star) {
-                status = "Find the solution";
                 return;
               }
             }
@@ -307,13 +317,11 @@ class _StarsGridState extends State<StarsGrid> {
     }
     // Vérifier qu'il y a exactement 1 étoile par ligne et par colonne
     if (totalStars != gridSize) {
-      status = "Find the solution";
       return;
     }
 
     for (int i = 0; i < gridSize; i++) {
       if (starsInRow[i] != 1 || starsInCol[i] != 1 || starsInZone[i] != 1) {
-        status = "Find the solution";
         return;
       }
     }
@@ -332,8 +340,7 @@ class _StarsGridState extends State<StarsGrid> {
 
     // Fonction récursive interne pour tester les lignes une par une
     void solve(int row) {
-      if (solutionsCount > 1)
-        return; // Optimisation : on s'arrête si on a déjà trouvé plusieurs solutions
+      if (solutionsCount > 1) return;
 
       if (row == size) {
         solutionsCount++;
@@ -417,7 +424,10 @@ class _StarsGridState extends State<StarsGrid> {
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'New game',
-            onPressed: _startNewGame,
+            onPressed: () {
+              _generationId = 0;
+              _startNewGame();
+            },
           ),
         ],
       ),
