@@ -21,6 +21,9 @@ class _StarsGridState extends State<StarsGrid> {
   late List<List<StatusBrick>> _grid;
   late List<List<int>> _zones;
 
+  int _currentSeed = 0;
+  String puzzleId = "";
+
   String status = "Find the solution";
   bool _isGenerating = false;
   int _generationId = 0;
@@ -76,16 +79,21 @@ class _StarsGridState extends State<StarsGrid> {
     super.dispose();
   }
 
-  void _startNewGame(int neededLevel) {
+  void _startNewGame(int neededLevel, {int? forceSeed}) {
     _generationId++;
+
+    _currentSeed = forceSeed ?? Random().nextInt(999999999);
+
     setState(() {
-      _grid = createPuzzle(gridSize, difficulty);
+      puzzleId = "$gridSize-$neededLevel-$_currentSeed";
+
+      _grid = createPuzzle(gridSize, difficulty, Random(_currentSeed));
       _zones = List.generate(gridSize, (_) => List.filled(gridSize, -1));
       status = "Generating...";
       _isGenerating = true;
     });
 
-    _generateZonesAsync(_generationId, neededLevel);
+    _generateZonesAsync(_generationId, neededLevel, _currentSeed);
   }
 
   void _biggerSize() {
@@ -154,8 +162,12 @@ class _StarsGridState extends State<StarsGrid> {
     );
   }
 
-  Future<void> _generateZonesAsync(int currentGen, int neededLevel) async {
-    Random random = Random();
+  Future<void> _generateZonesAsync(
+    int currentGen,
+    int neededLevel,
+    int seed,
+  ) async {
+    Random random = Random(seed);
     int size = gridSize;
     List<List<List<int>>> frontiers = List.generate(size, (_) => []);
 
@@ -243,6 +255,8 @@ class _StarsGridState extends State<StarsGrid> {
     if (_generationId != currentGen) return;
 
     setState(() {
+      puzzleId = "$size-$level-$seed";
+
       for (int r = 0; r < size; r++) {
         for (int c = 0; c < size; c++) {
           _grid[r][c] = StatusBrick.empty; // Cacher les étoiles
@@ -419,7 +433,11 @@ class _StarsGridState extends State<StarsGrid> {
     }
   }
 
-  List<List<StatusBrick>> createPuzzle(int size, int difficulty) {
+  List<List<StatusBrick>> createPuzzle(
+    int size,
+    int difficulty,
+    Random random,
+  ) {
     // Create an empty grid
     List<List<StatusBrick>> list = List.generate(
       size,
@@ -428,18 +446,23 @@ class _StarsGridState extends State<StarsGrid> {
 
     // Find positions for the stars
     if (difficulty > 0) {
-      _placeStars(list, 0, size);
+      _placeStars(list, 0, size, random);
     }
 
     return list;
   }
 
-  bool _placeStars(List<List<StatusBrick>> grid, int col, int size) {
+  bool _placeStars(
+    List<List<StatusBrick>> grid,
+    int col,
+    int size,
+    Random random,
+  ) {
     // Si on a réussi à remplir toutes les colonnes, on a gagné !
     if (col == size) return true;
 
     // Créer une liste de lignes (0 à size-1) et la mélanger pour l'aléatoire
-    List<int> rows = List.generate(size, (i) => i)..shuffle();
+    List<int> rows = List.generate(size, (i) => i)..shuffle(random);
 
     // Essayer de placer une étoile dans chaque ligne de cette colonne
     for (int row in rows) {
@@ -448,7 +471,7 @@ class _StarsGridState extends State<StarsGrid> {
         grid[row][col] = StatusBrick.star;
 
         // Passer à la colonne suivante. Si elle réussit, on renvoie vrai !
-        if (_placeStars(grid, col + 1, size)) {
+        if (_placeStars(grid, col + 1, size, random)) {
           return true;
         }
 
@@ -694,6 +717,53 @@ class _StarsGridState extends State<StarsGrid> {
     return formattedText;
   }
 
+  void _showLoadPuzzleDialog() {
+    final TextEditingController controller = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Load Puzzle ID"),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            hintText: "Ex: 5-2-123456789",
+            labelText: "Paste ID here",
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: () {
+              try {
+                // Découper le texte "Taille-Niveau-Seed"
+                List<String> parts = controller.text.trim().split('-');
+                if (parts.length == 3) {
+                  int loadedSize = int.parse(parts[0]);
+                  int loadedLevel = int.parse(parts[1]);
+                  int loadedSeed = int.parse(parts[2]);
+
+                  // Mettre à jour la grille et lancer
+                  gridSize = loadedSize;
+                  Navigator.pop(context);
+
+                  _generationId = 0; // Reset
+                  _startNewGame(loadedLevel, forceSeed: loadedSeed);
+                }
+              } catch (e) {
+                // L'ID est invalide (Optionnel: afficher un message d'erreur)
+              }
+            },
+            child: const Text("Load"),
+          ),
+        ],
+      ),
+    );
+  }
+
   // TODO
   // Share puzzle id
   // Mark stars as red when in conflict
@@ -722,6 +792,11 @@ class _StarsGridState extends State<StarsGrid> {
             icon: const Icon(Icons.refresh),
             tooltip: 'New game',
             onPressed: _newGameButton,
+          ),
+          IconButton(
+            icon: const Icon(Icons.grid_on),
+            tooltip: 'Load an ID',
+            onPressed: _showLoadPuzzleDialog,
           ),
         ],
       ),
@@ -771,7 +846,7 @@ class _StarsGridState extends State<StarsGrid> {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        Text("Gen #$_generationId"),
+                        Text("ID: $puzzleId"),
                       ],
                     ),
                   ),
