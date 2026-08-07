@@ -590,7 +590,8 @@ class _StarsGridState extends State<StarsGrid> {
             pos[1] >= 0 &&
             pos[1] < gridSize &&
             !(pos[0] == y && pos[1] == x)) {
-          _grid[pos[0]][pos[1]] = StatusBrick.tick;
+if (_grid[pos[0]][pos[1]] != StatusBrick.star)
+         { _grid[pos[0]][pos[1]] = StatusBrick.tick;}
         }
       }
     });
