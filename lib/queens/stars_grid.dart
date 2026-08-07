@@ -28,16 +28,28 @@ class _StarsGridState extends State<StarsGrid> {
   bool autoTicks = false;
 
   static const List<Color> zoneColors = [
-    Colors.red,
-    Colors.blue,
-    Colors.green,
-    Colors.grey,
-    Colors.purpleAccent,
-    Colors.tealAccent,
-    Colors.yellowAccent,
-    Colors.orange,
-    Colors.lightGreenAccent,
-    Colors.black,
+    // [COLOR USED]
+    Color.fromARGB(255, 200, 75, 49),
+    Color.fromARGB(255, 236, 154, 41),
+    Color.fromARGB(255, 55, 110, 71),
+    Color.fromARGB(255, 52, 185, 152),
+    Color.fromARGB(255, 59, 91, 165),
+    Color.fromARGB(255, 123, 82, 130),
+    Color.fromARGB(255, 217, 107, 138),
+    Color.fromARGB(255, 108, 122, 137),
+
+    // [----]
+    Color.fromARGB(255, 76, 127, 175),
+    Color.fromARGB(255, 0, 128, 128),
+    Color.fromARGB(255, 214, 40, 40),
+    Color(0xFFF77F00),
+    Color(0xFFFCBF49),
+    Color(0xFF2A9D8F),
+    Color(0xFF000A8E),
+    Color(0xFF7209B7),
+    Color.fromARGB(255, 141, 153, 174),
+    Color(0xFF08D99A),
+    Color(0xFFF72585),
   ];
 
   @override
@@ -590,12 +602,18 @@ class _StarsGridState extends State<StarsGrid> {
             pos[1] >= 0 &&
             pos[1] < gridSize &&
             !(pos[0] == y && pos[1] == x)) {
-if (_grid[pos[0]][pos[1]] != StatusBrick.star)
-         { _grid[pos[0]][pos[1]] = StatusBrick.tick;}
+          if (_grid[pos[0]][pos[1]] != StatusBrick.star) {
+            _grid[pos[0]][pos[1]] = StatusBrick.tick;
+          }
         }
       }
     });
   }
+
+  // TODO
+  // Timer
+  // Share puzzle id
+  // Choose difficulty
 
   @override
   Widget build(BuildContext context) {

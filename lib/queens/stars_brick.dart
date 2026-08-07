@@ -17,30 +17,38 @@ class StarsBrick extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isStar = status.name == "star";
-    final icon = status.name == "tick"
+    final isTick = status.name == "tick";
+    final icon = isTick
         ? Icons.close
-        : status.name == "star"
+        : isStar
         ? Icons.star
         : null;
 
-    return Container(
-      color: color,
-      child: OutlinedButton(
-        onPressed: onTap,
-        style: OutlinedButton.styleFrom(
-          padding: EdgeInsets.zero,
-          minimumSize: Size.zero,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+    return OutlinedButton(
+      onPressed: onTap,
+      style: OutlinedButton.styleFrom(
+        backgroundColor: (!isTick && !isStar)
+            ? color
+            : Color.fromARGB(
+                240,
+                (color.r * 255).round(),
+                (color.g * 255).round(),
+                (color.b * 255).round(),
+              ),
+        padding: EdgeInsets.zero,
+        minimumSize: Size.zero,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(17.0),
         ),
-        child: FittedBox(
-          child: Icon(
-            icon,
-            color: isStar ? Colors.white : Colors.black,
-            size: isStar ? 40 : 20,
-            shadows: isStar
-                ? [Shadow(color: Colors.black, offset: Offset(1, 1))]
-                : [],
-          ),
+      ),
+      child: FittedBox(
+        child: Icon(
+          icon,
+          color: isStar ? Colors.white : Colors.white12,
+          size: isStar ? 40 : 17.5,
+          shadows: isStar
+              ? [Shadow(color: Colors.black, offset: Offset(1, 1))]
+              : [Shadow(color: Colors.black, offset: Offset(0.5, 0.5))],
         ),
       ),
     );
