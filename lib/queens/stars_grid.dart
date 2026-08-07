@@ -25,6 +25,7 @@ class _StarsGridState extends State<StarsGrid> {
   int _generationId = 0;
 
   bool hasTicks = true;
+  bool autoTicks = false;
 
   static const List<Color> zoneColors = [
     Colors.red,
@@ -52,7 +53,7 @@ class _StarsGridState extends State<StarsGrid> {
     setState(() {
       _grid = createPuzzle(gridSize, difficulty);
       _zones = List.generate(gridSize, (_) => List.filled(gridSize, -1));
-      status = "Generating... attempt $_generationId";
+      status = "Generating...";
       _isGenerating = true;
     });
 
@@ -174,7 +175,7 @@ class _StarsGridState extends State<StarsGrid> {
           : level == 2
           ? "Normal"
           : "Hard";
-      status = "[$difficultyText] Find the solution (gen #$_generationId)";
+      status = "[$difficultyText] Find the solution";
       _isGenerating = false;
     });
   }
@@ -532,7 +533,7 @@ class _StarsGridState extends State<StarsGrid> {
     return solutionsCount;
   }
 
-  void _onBrickTapped(int x, int y) {
+  Future<void> _onBrickTapped(int x, int y) async {
     if (_isGenerating) return;
 
     setState(() {
@@ -545,6 +546,53 @@ class _StarsGridState extends State<StarsGrid> {
           : StatusBrick.empty;
 
       _testVictory();
+    });
+
+    if (hasTicks && autoTicks && _grid[y][x] == StatusBrick.star) {
+      //   await Future.delayed(Duration(seconds: 2));
+      if (hasTicks && autoTicks && _grid[y][x] == StatusBrick.star) {
+        autoTicker(y, x);
+      }
+    }
+  }
+
+  void autoTicker(int y, int x) {
+    final List<List<int>> adjacents = [
+      [y - 1, x - 1],
+      [y - 1, x],
+      [y - 1, x + 1],
+      [y, x - 1],
+      [y, x + 1],
+      [y + 1, x - 1],
+      [y + 1, x],
+      [y + 1, x + 1],
+    ];
+    List<List<int>> positions;
+    positions = [];
+    positions.addAll(adjacents);
+
+    final zone = _zones[y][x];
+
+    for (var i = 0; i < gridSize; i++) {
+      positions.add([y, i]);
+      positions.add([i, x]);
+      for (var j = 0; j < gridSize; j++) {
+        if (_zones[i][j] == zone) {
+          positions.add([i, j]);
+        }
+      }
+    }
+
+    setState(() {
+      for (var pos in positions) {
+        if (pos[0] >= 0 &&
+            pos[0] < gridSize &&
+            pos[1] >= 0 &&
+            pos[1] < gridSize &&
+            !(pos[0] == y && pos[1] == x)) {
+          _grid[pos[0]][pos[1]] = StatusBrick.tick;
+        }
+      }
     });
   }
 
@@ -599,6 +647,7 @@ class _StarsGridState extends State<StarsGrid> {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
+                  Text("Gen #$_generationId"),
                 ],
               ),
             ),
@@ -659,6 +708,17 @@ class _StarsGridState extends State<StarsGrid> {
                           }
                         }
                       }
+                    });
+                  },
+                ),
+                SizedBox(width: 50),
+                Text("Auto ticks?"),
+                SizedBox(width: 12),
+                Checkbox(
+                  value: autoTicks,
+                  onChanged: (bool? newValue) {
+                    setState(() {
+                      autoTicks = newValue ?? false;
                     });
                   },
                 ),
