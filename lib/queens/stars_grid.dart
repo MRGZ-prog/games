@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:games/queens/stars_brick.dart';
 import 'package:games/queens/stars_solver.dart';
 
@@ -81,6 +82,7 @@ class _StarsGridState extends State<StarsGrid> {
 
   void _startNewGame(int neededLevel, {int? forceSeed}) {
     _generationId++;
+    stopwatch.reset();
 
     _currentSeed = forceSeed ?? Random().nextInt(999999999);
 
@@ -269,7 +271,7 @@ class _StarsGridState extends State<StarsGrid> {
           : "Hard";
       status = "[$difficultyText] Find the solution";
       _isGenerating = false;
-      stopwatch.reset();
+
       stopwatch.start();
     });
   }
@@ -588,7 +590,7 @@ class _StarsGridState extends State<StarsGrid> {
     void solve(int row) {
       if (solutionsCount > 1) return;
 
-      if (row == size) {
+      if (row >= size) {
         solutionsCount++;
         return;
       }
@@ -765,7 +767,6 @@ class _StarsGridState extends State<StarsGrid> {
   }
 
   // TODO
-  // Share puzzle id
   // Mark stars as red when in conflict
   // Undo button + clear board
 
@@ -846,7 +847,21 @@ class _StarsGridState extends State<StarsGrid> {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        Text("ID: $puzzleId"),
+                        TextButton(
+                          onPressed: () async {
+                            await Clipboard.setData(
+                              ClipboardData(text: puzzleId),
+                            );
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Copied to clipboard!'),
+                                ),
+                              );
+                            }
+                          },
+                          child: Text("ID: $puzzleId"),
+                        ),
                       ],
                     ),
                   ),
