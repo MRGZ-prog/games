@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -23,6 +24,9 @@ class _StarsGridState extends State<StarsGrid> {
   String status = "Find the solution";
   bool _isGenerating = false;
   int _generationId = 0;
+
+  final Stopwatch stopwatch = Stopwatch();
+  Timer? _timer;
 
   bool hasTicks = true;
   bool autoTicks = false;
@@ -57,10 +61,22 @@ class _StarsGridState extends State<StarsGrid> {
     super.initState();
     gridSize = widget.initGridSize;
     difficulty = widget.initDifficulty;
-    _startNewGame();
+    _startNewGame(0);
+
+    _timer = Timer.periodic(const Duration(milliseconds: 30), (timer) {
+      if (stopwatch.isRunning && mounted) {
+        setState(() {});
+      }
+    });
   }
 
-  void _startNewGame() {
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  void _startNewGame(int neededLevel) {
     _generationId++;
     setState(() {
       _grid = createPuzzle(gridSize, difficulty);
@@ -69,7 +85,7 @@ class _StarsGridState extends State<StarsGrid> {
       _isGenerating = true;
     });
 
-    _generateZonesAsync(_generationId);
+    _generateZonesAsync(_generationId, neededLevel);
   }
 
   void _biggerSize() {
@@ -77,7 +93,7 @@ class _StarsGridState extends State<StarsGrid> {
     if (gridSize < min(zoneColors.length, 8)) {
       gridSize++;
       _generationId = 0;
-      _startNewGame();
+      _startNewGame(0);
     }
   }
 
@@ -86,11 +102,59 @@ class _StarsGridState extends State<StarsGrid> {
     if (gridSize > 4) {
       gridSize--;
       _generationId = 0;
-      _startNewGame();
+      _startNewGame(0);
     }
   }
 
-  Future<void> _generateZonesAsync(int currentGen) async {
+  void _newGameButton() {
+    showDialog<String>(
+      context: context,
+      builder: (BuildContext context) => AlertDialog(
+        title: const Text('New game'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Attention!'),
+            const Text('You will launch a new game.'),
+            const Text('Please select the difficulty.'),
+          ],
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.pop(context, 'Cancel'),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context, 'Easy');
+              _generationId = 0;
+              _startNewGame(1);
+            },
+            child: const Text('Easy'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context, 'Normal');
+              _generationId = 0;
+              _startNewGame(2);
+            },
+            child: const Text('Normal'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context, 'Hard');
+              _generationId = 0;
+              _startNewGame(3);
+            },
+            child: const Text('Hard'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _generateZonesAsync(int currentGen, int neededLevel) async {
     Random random = Random();
     int size = gridSize;
     List<List<List<int>>> frontiers = List.generate(size, (_) => []);
@@ -149,9 +213,11 @@ class _StarsGridState extends State<StarsGrid> {
         HumanSolverResult result = solver.solve();
 
         if (result.isSolvable) {
-          success = true;
           level = result.difficultyLevel;
-          break; // VICTOIRE ! On sort de la boucle de mutation
+          if (neededLevel == 0 || neededLevel == level) {
+            success = true;
+            break; // VICTOIRE ! On sort de la boucle de mutation
+          }
         }
       }
 
@@ -168,7 +234,7 @@ class _StarsGridState extends State<StarsGrid> {
       // Si même après 50 mutations on n'y arrive pas, on recommence de 0.
       // Cela arrivera beaucoup moins souvent qu'avant !
       if (_generationId == currentGen) {
-        _startNewGame();
+        _startNewGame(neededLevel);
       }
       return;
     }
@@ -189,6 +255,8 @@ class _StarsGridState extends State<StarsGrid> {
           : "Hard";
       status = "[$difficultyText] Find the solution";
       _isGenerating = false;
+      stopwatch.reset();
+      stopwatch.start();
     });
   }
 
@@ -480,6 +548,7 @@ class _StarsGridState extends State<StarsGrid> {
       }
     }
 
+    stopwatch.stop();
     status = "Victory";
   }
 
@@ -610,14 +679,31 @@ class _StarsGridState extends State<StarsGrid> {
     });
   }
 
+  String _formatStopwatch() {
+    final duration = stopwatch.elapsed;
+    String twoDigits(int n) => n.toString().padLeft(2, "0");
+    String? hours;
+    if (duration >= Duration(hours: 1)) {
+      hours = twoDigits(duration.inHours.remainder(60));
+    }
+    String minutes = twoDigits(duration.inMinutes.remainder(60));
+    String seconds = twoDigits(duration.inSeconds.remainder(60));
+    final formattedText = hours == null
+        ? "$minutes:$seconds"
+        : "$hours:$minutes:$seconds";
+    return formattedText;
+  }
+
   // TODO
-  // Timer
   // Share puzzle id
-  // Choose difficulty
   // Mark stars as red when in conflict
+  // Undo button + clear board
 
   @override
   Widget build(BuildContext context) {
+    final int ms = stopwatch.elapsedMilliseconds % 60000;
+    final bool isNearMinute = ms < 2000 || ms > 58000;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Constellations'),
@@ -635,10 +721,7 @@ class _StarsGridState extends State<StarsGrid> {
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'New game',
-            onPressed: () {
-              _generationId = 0;
-              _startNewGame();
-            },
+            onPressed: _newGameButton,
           ),
         ],
       ),
@@ -653,54 +736,81 @@ class _StarsGridState extends State<StarsGrid> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  Column(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      Text(
-                        "Size : ${gridSize}x$gridSize",
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
+                  Expanded(
+                    flex: 1,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          _formatStopwatch(),
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: isNearMinute ? FontWeight.bold : null,
+                            color: isNearMinute ? Colors.red : null,
+                          ),
                         ),
-                      ),
-                      Text(
-                        status,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      Text("Gen #$_generationId"),
-                    ],
+                      ],
+                    ),
                   ),
-                  TextButton(
-                    onPressed: () {
-                      showDialog<String>(
-                        context: context,
-                        builder: (BuildContext context) => AlertDialog(
-                          title: const Text('Rules'),
-                          content: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Place EXACTLY ONE star in every column, row and color zone!',
-                              ),
-                              const Text(
-                                'Stars cannot touch each other, even diagonally.',
+                  Expanded(
+                    flex: 1,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          "Size : ${gridSize}x$gridSize",
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          status,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text("Gen #$_generationId"),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    flex: 1,
+                    child: TextButton(
+                      onPressed: () {
+                        showDialog<String>(
+                          context: context,
+                          builder: (BuildContext context) => AlertDialog(
+                            title: const Text('Rules'),
+                            content: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Place EXACTLY ONE star in every column, row and color zone!',
+                                ),
+                                SizedBox(height: 12),
+                                const Text(
+                                  'Stars cannot touch each other, even diagonally.',
+                                ),
+                                SizedBox(height: 12),
+                                const Text(
+                                  'Activate Auto ticks to show these rules in action when you place a star.',
+                                ),
+                              ],
+                            ),
+                            actions: <Widget>[
+                              TextButton(
+                                onPressed: () => Navigator.pop(context, 'OK'),
+                                child: const Text('OK'),
                               ),
                             ],
                           ),
-                          actions: <Widget>[
-                            TextButton(
-                              onPressed: () => Navigator.pop(context, 'OK'),
-                              child: const Text('OK'),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                    child: Text("Rules"),
+                        );
+                      },
+                      child: Text("Rules"),
+                    ),
                   ),
                 ],
               ),
@@ -744,37 +854,47 @@ class _StarsGridState extends State<StarsGrid> {
               ),
             ),
             Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                Text("Activate ticks"),
-                SizedBox(width: 12),
-                Switch(
-                  value: hasTicks,
-                  onChanged: (bool newValue) {
-                    setState(() {
-                      hasTicks = newValue;
-                      if (!hasTicks) {
-                        for (final column in _grid) {
-                          for (var y = 0; y < column.length; y++) {
-                            if (column[y] == StatusBrick.tick) {
-                              column[y] = StatusBrick.empty;
+                Row(
+                  children: [
+                    Text("Activate ticks"),
+                    SizedBox(width: 6),
+                    Switch(
+                      value: hasTicks,
+                      onChanged: (bool newValue) {
+                        setState(() {
+                          hasTicks = newValue;
+                          if (!hasTicks) {
+                            for (final column in _grid) {
+                              for (var y = 0; y < column.length; y++) {
+                                if (column[y] == StatusBrick.tick) {
+                                  column[y] = StatusBrick.empty;
+                                }
+                              }
                             }
                           }
-                        }
-                      }
-                    });
-                  },
+                        });
+                      },
+                    ),
+                  ],
                 ),
-                SizedBox(width: 50),
-                Text("Auto ticks?"),
-                SizedBox(width: 12),
-                Checkbox(
-                  value: autoTicks,
-                  onChanged: (bool? newValue) {
-                    setState(() {
-                      autoTicks = newValue ?? false;
-                    });
-                  },
+
+                TextButton(onPressed: () {}, child: Text("Help")),
+
+                Row(
+                  children: [
+                    Text("Auto ticks?"),
+                    SizedBox(width: 6),
+                    Checkbox(
+                      value: autoTicks,
+                      onChanged: (bool? newValue) {
+                        setState(() {
+                          autoTicks = newValue ?? false;
+                        });
+                      },
+                    ),
+                  ],
                 ),
               ],
             ),
