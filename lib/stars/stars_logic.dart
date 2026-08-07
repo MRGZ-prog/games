@@ -6,9 +6,10 @@ import 'stars_constants.dart';
 class PuzzleData {
   final List<List<StatusBrick>> grid;
   final List<List<int>> zones;
+  final List<List<StatusBrick>> solution;
   final int level;
 
-  PuzzleData(this.grid, this.zones, this.level);
+  PuzzleData(this.grid, this.zones, this.solution, this.level);
 }
 
 class PuzzleLogic {
@@ -86,6 +87,12 @@ class PuzzleLogic {
 
     if (!success) return null; // Retourne null si échec, l'UI gérera le retry
 
+    // Save the solution
+    List<List<StatusBrick>> solutionGrid = List.generate(
+      size,
+      (r) => List.generate(size, (c) => grid[r][c]),
+    );
+
     // Masquer les étoiles pour le joueur
     for (int r = 0; r < size; r++) {
       for (int c = 0; c < size; c++) {
@@ -93,7 +100,7 @@ class PuzzleLogic {
       }
     }
 
-    return PuzzleData(grid, zones, level);
+    return PuzzleData(grid, zones, solutionGrid, level);
   }
 
   // --- Méthodes privées recopiées depuis votre code original ---

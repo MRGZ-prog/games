@@ -278,6 +278,39 @@ class HumanSolver {
   }
 
   // ==========================================
+  // SYSTÈME D'INDICE INTELLIGENT
+  // ==========================================
+  List<List<int>> getHintCrosses(List<List<SolverCell>> currentState) {
+    // 1. Créer une copie de travail de la grille actuelle
+    List<List<SolverCell>> grid = List.generate(
+      size,
+      (r) => List.generate(size, (c) => currentState[r][c]),
+    );
+
+    // 2. Tenter d'appliquer les règles logiques (une seule passe)
+    bool progress =
+        _applyBasicRules(grid) ||
+        _applyIntersectionRule(grid) ||
+        _applySubsetRules(grid);
+
+    List<List<int>> newCrosses = [];
+
+    if (progress) {
+      // 3. Comparer l'état initial et le nouvel état pour extraire les déductions
+      for (int r = 0; r < size; r++) {
+        for (int c = 0; c < size; c++) {
+          // Si la logique a placé une croix là où il n'y avait rien
+          if (currentState[r][c] == SolverCell.empty &&
+              grid[r][c] == SolverCell.cross) {
+            newCrosses.add([r, c]);
+          }
+        }
+      }
+    }
+    return newCrosses;
+  }
+
+  // ==========================================
   // OUTILS & HELPERS
   // ==========================================
 

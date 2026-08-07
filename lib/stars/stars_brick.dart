@@ -6,12 +6,14 @@ class StarsBrick extends StatelessWidget {
   final StatusBrick status;
   final Color color;
   final VoidCallback onTap;
+  final bool hasConflict;
 
   const StarsBrick({
     super.key,
     required this.status,
     required this.color,
     required this.onTap,
+    this.hasConflict = false,
   });
 
   @override
@@ -44,7 +46,11 @@ class StarsBrick extends StatelessWidget {
       child: FittedBox(
         child: Icon(
           icon,
-          color: isStar ? Colors.white : Colors.white12,
+          color: hasConflict
+              ? Colors.red
+              : isStar
+              ? Colors.white
+              : Colors.white12,
           size: isStar ? 40 : 17.5,
           shadows: isStar
               ? [Shadow(color: Colors.black, offset: Offset(1, 1))]

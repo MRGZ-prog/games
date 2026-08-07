@@ -767,7 +767,6 @@ class _StarsGridState extends State<StarsGrid> {
   }
 
   // TODO
-  // Mark stars as red when in conflict
   // Undo button + clear board
 
   @override

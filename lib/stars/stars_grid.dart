@@ -5,6 +5,7 @@ import 'package:games/stars/stars_constants.dart';
 import 'package:games/stars/stars_dialog_utils.dart';
 import 'package:games/stars/stars_brick.dart';
 import 'package:games/stars/stars_logic.dart';
+import 'package:games/stars/stars_solver.dart';
 import 'package:games/stars/widgets/stopwatch_text.dart';
 
 class StarsGrid extends StatefulWidget {
@@ -23,6 +24,8 @@ class _StarsGridState extends State<StarsGrid> {
 
   List<List<StatusBrick>>? _grid;
   List<List<int>>? _zones;
+  List<List<StatusBrick>>? _solution;
+  List<List<bool>>? _conflicts;
 
   String puzzleId = "";
   String status = "Find the solution";
@@ -72,6 +75,8 @@ class _StarsGridState extends State<StarsGrid> {
     setState(() {
       _grid = data.grid;
       _zones = data.zones;
+      _solution = data.solution;
+      _conflicts = List.generate(gridSize, (_) => List.filled(gridSize, false));
       final diffText = data.level == 1
           ? "Easy"
           : data.level == 2
@@ -93,6 +98,81 @@ class _StarsGridState extends State<StarsGrid> {
       gridSize = newSize;
       _startNewGame(0);
     }
+  }
+
+  void clearGrid() {
+    _grid = List.generate(
+      gridSize,
+      (_) => List.filled(gridSize, StatusBrick.empty),
+    );
+  }
+
+  void _giveHint() {
+    if (_grid == null || _solution == null || _zones == null) return;
+
+    List<List<int>> incorrectStars = [];
+    for (int r = 0; r < gridSize; r++) {
+      for (int c = 0; c < gridSize; c++) {
+        if (_grid![r][c] == StatusBrick.star &&
+            _solution![r][c] != StatusBrick.star) {
+          incorrectStars.add([r, c]);
+        }
+      }
+    }
+
+    setState(() {
+      hasTicks = true; // On s'assure que les ticks sont activés visuellement
+
+      if (incorrectStars.isNotEmpty) {
+        // Le joueur a fait une erreur : on lui montre en remplaçant la fausse étoile par un tick
+        incorrectStars.shuffle();
+        var p = incorrectStars.first;
+        _grid![p[0]][p[1]] = StatusBrick.tick;
+        return;
+      }
+
+      // Solver help
+      List<List<SolverCell>> solverGrid = List.generate(
+        gridSize,
+        (r) => List.generate(gridSize, (c) {
+          if (_grid![r][c] == StatusBrick.star) return SolverCell.star;
+          if (_grid![r][c] == StatusBrick.tick) return SolverCell.cross;
+          return SolverCell.empty;
+        }),
+      );
+
+      // Instancier le solveur avec l'état de la partie
+      HumanSolver solver = HumanSolver(size: gridSize, zones: _zones!);
+      List<List<int>> logicalCrosses = solver.getHintCrosses(solverGrid);
+
+      if (logicalCrosses.isNotEmpty) {
+        // On mélange et on révèle jusqu'à 3 ticks déduits par la logique
+        // (pour ne pas résoudre toute la grille d'un coup si une règle bloque 10 cases)
+        logicalCrosses.shuffle();
+        int hintsToGive = min(1, logicalCrosses.length);
+        for (int i = 0; i < hintsToGive; i++) {
+          var p = logicalCrosses[i];
+          _grid![p[0]][p[1]] = StatusBrick.tick;
+        }
+      } else {
+        // Fallback (Rare) : S'il n'y a plus de logique possible (ou que la grille ne requiert que de forcer une étoile)
+        // On donne un tick valide aléatoire
+        // List<List<int>> fallbackTicks = [];
+        // for (int r = 0; r < gridSize; r++) {
+        //   for (int c = 0; c < gridSize; c++) {
+        //     if (_grid![r][c] == StatusBrick.empty &&
+        //         _solution![r][c] != StatusBrick.star) {
+        //       fallbackTicks.add([r, c]);
+        //     }
+        //   }
+        // }
+        // if (fallbackTicks.isNotEmpty) {
+        //   fallbackTicks.shuffle();
+        //   var p = fallbackTicks.first;
+        //   _grid![p[0]][p[1]] = StatusBrick.tick;
+        // }
+      }
+    });
   }
 
   void _onBrickTapped(int x, int y) async {
@@ -141,6 +221,8 @@ class _StarsGridState extends State<StarsGrid> {
     List<int> starsInCol = List.filled(gridSize, 0);
     List<int> starsInZone = List.filled(gridSize, 0);
 
+    _conflicts = List.generate(gridSize, (_) => List.filled(gridSize, false));
+
     for (int r = 0; r < gridSize; r++) {
       for (int c = 0; c < gridSize; c++) {
         if (_grid![r][c] == StatusBrick.star) {
@@ -149,24 +231,51 @@ class _StarsGridState extends State<StarsGrid> {
           starsInCol[c]++;
           starsInZone[_zones![r][c]]++;
 
+          // for (var dir in GameConstants.directions8) {
+          //   int nr = r + dir[0], nc = c + dir[1];
+          //   if (nr >= 0 && nr < gridSize && nc >= 0 && nc < gridSize) {
+          //     if (_grid![nr][nc] == StatusBrick.star) {
+          //       return; // Touche une étoile
+          //     }
+          //   }
+          // }
+        }
+      }
+    }
+
+    bool hasAnyConflict = false;
+
+    for (int r = 0; r < gridSize; r++) {
+      for (int c = 0; c < gridSize; c++) {
+        if (_grid![r][c] == StatusBrick.star) {
+          bool isConflict = false;
+
+          // Vérification Ligne, Colonne, Zone
+          if (starsInRow[r] > 1) isConflict = true;
+          if (starsInCol[c] > 1) isConflict = true;
+          if (starsInZone[_zones![r][c]] > 1) isConflict = true;
+
+          // Vérification de la Proximité (les 8 cases autour)
           for (var dir in GameConstants.directions8) {
             int nr = r + dir[0], nc = c + dir[1];
             if (nr >= 0 && nr < gridSize && nc >= 0 && nc < gridSize) {
               if (_grid![nr][nc] == StatusBrick.star) {
-                return; // Touche une étoile
+                isConflict = true;
               }
             }
+          }
+
+          // Si un conflit est détecté, on met à jour notre matrice _conflicts
+          if (isConflict) {
+            _conflicts![r][c] = true;
+            hasAnyConflict = true;
           }
         }
       }
     }
 
     if (totalStars != gridSize) return;
-    if (starsInRow.any((v) => v != 1) ||
-        starsInCol.any((v) => v != 1) ||
-        starsInZone.any((v) => v != 1)) {
-      return;
-    }
+    if (hasAnyConflict) return;
 
     stopwatch.stop();
     status = "Victory";
@@ -284,6 +393,9 @@ class _StarsGridState extends State<StarsGrid> {
                       child: StarsBrick(
                         status: _grid![y][x],
                         color: brickColor,
+                        hasConflict: _conflicts != null
+                            ? _conflicts![y][x]
+                            : false,
                         onTap: () => _onBrickTapped(x, y),
                       ),
                     ),
@@ -301,43 +413,69 @@ class _StarsGridState extends State<StarsGrid> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
-        Row(
-          children: [
-            const Text("Activate ticks"),
-            SizedBox(width: 6),
-            Switch(
-              value: hasTicks,
-              onChanged: (newValue) {
-                setState(() {
-                  hasTicks = newValue;
-                  if (!hasTicks && _grid != null) {
-                    for (var row in _grid!) {
-                      for (int i = 0; i < row.length; i++) {
-                        if (row[i] == StatusBrick.tick) {
-                          row[i] = StatusBrick.empty;
-                        }
-                      }
-                    }
-                  }
-                });
-              },
-            ),
-          ],
+        Expanded(
+          child: TextButton(onPressed: _giveHint, child: const Text("Help")),
         ),
 
-        TextButton(onPressed: () {}, child: Text("Help")),
+        Expanded(
+          child: TextButton(
+            onPressed: () {
+              setState(() {
+                _grid = List.generate(
+                  gridSize,
+                  (_) => List.filled(gridSize, StatusBrick.empty),
+                );
+              });
+            },
+            child: const Text("Clear"),
+          ),
+        ),
 
-        Row(
-          children: [
-            const Text("Auto ticks"),
-            SizedBox(width: 6),
-            Checkbox(
-              value: autoTicks,
-              onChanged: (newValue) => setState(() {
-                autoTicks = newValue ?? false;
-              }),
-            ),
-          ],
+        Expanded(
+          child: Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text("Activate ticks"),
+                  SizedBox(width: 6),
+                  Checkbox(
+                    value: hasTicks,
+                    onChanged: (newValue) {
+                      setState(() {
+                        hasTicks = newValue ?? false;
+                        if (!hasTicks && _grid != null) {
+                          for (var row in _grid!) {
+                            for (int i = 0; i < row.length; i++) {
+                              if (row[i] == StatusBrick.tick) {
+                                row[i] = StatusBrick.empty;
+                              }
+                            }
+                          }
+                        }
+                      });
+                    },
+                  ),
+                ],
+              ),
+
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text("Auto ticks"),
+                  SizedBox(width: 6),
+                  Checkbox(
+                    value: autoTicks,
+                    onChanged: hasTicks
+                        ? (newValue) => setState(() {
+                            autoTicks = newValue ?? false;
+                          })
+                        : null,
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ],
     );
