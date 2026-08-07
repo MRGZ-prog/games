@@ -24,21 +24,19 @@ class _StarsGridState extends State<StarsGrid> {
   bool _isGenerating = false;
   int _generationId = 0;
 
+  bool hasTicks = true;
+
   static const List<Color> zoneColors = [
-    Colors.redAccent,
-    Colors.blueAccent,
+    Colors.red,
+    Colors.blue,
     Colors.green,
-    Colors.orangeAccent,
-    Colors.purpleAccent,
-    Colors.pinkAccent,
-    Colors.yellow,
     Colors.grey,
-    Colors.deepOrangeAccent,
-    Colors.indigoAccent,
-    Colors.lightGreenAccent,
+    Colors.purpleAccent,
     Colors.tealAccent,
+    Colors.yellowAccent,
+    Colors.orange,
+    Colors.lightGreenAccent,
     Colors.black,
-    Colors.white,
   ];
 
   @override
@@ -63,7 +61,7 @@ class _StarsGridState extends State<StarsGrid> {
 
   void _biggerSize() {
     if (_isGenerating) return;
-    if (gridSize < zoneColors.length) {
+    if (gridSize < min(zoneColors.length, 8)) {
       gridSize++;
       _generationId = 0;
       _startNewGame();
@@ -219,7 +217,7 @@ class _StarsGridState extends State<StarsGrid> {
         // Si elle touche au moins une autre zone, c'est une candidate
         if (neighborZones.isNotEmpty) {
           // Format : [row, col, neighbor_zone_1, neighbor_zone_2...]
-          candidates.add([r, c, ...neighborZones.toList()]);
+          candidates.add([r, c, ...neighborZones]);
         }
       }
     }
@@ -538,8 +536,10 @@ class _StarsGridState extends State<StarsGrid> {
     if (_isGenerating) return;
 
     setState(() {
-      _grid[y][x] = _grid[y][x] == StatusBrick.empty
-          ? StatusBrick.tick
+      _grid[y][x] = (_grid[y][x] == StatusBrick.empty)
+          ? (hasTicks)
+                ? StatusBrick.tick
+                : StatusBrick.star
           : _grid[y][x] == StatusBrick.tick
           ? StatusBrick.star
           : StatusBrick.empty;
@@ -582,7 +582,7 @@ class _StarsGridState extends State<StarsGrid> {
                 vertical: 12.0,
                 horizontal: 16.0,
               ),
-              child: Row(
+              child: Column(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
                   Text(
@@ -639,6 +639,30 @@ class _StarsGridState extends State<StarsGrid> {
                   ),
                 ),
               ),
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text("Activate ticks"),
+                SizedBox(width: 12),
+                Switch(
+                  value: hasTicks,
+                  onChanged: (bool newValue) {
+                    setState(() {
+                      hasTicks = newValue;
+                      if (!hasTicks) {
+                        for (final column in _grid) {
+                          for (var y = 0; y < column.length; y++) {
+                            if (column[y] == StatusBrick.tick) {
+                              column[y] = StatusBrick.empty;
+                            }
+                          }
+                        }
+                      }
+                    });
+                  },
+                ),
+              ],
             ),
           ],
         ),
