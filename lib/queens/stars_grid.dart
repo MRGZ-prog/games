@@ -549,7 +549,7 @@ class _StarsGridState extends State<StarsGrid> {
     });
 
     if (hasTicks && autoTicks && _grid[y][x] == StatusBrick.star) {
-      //   await Future.delayed(Duration(seconds: 2));
+      await Future.delayed(Duration(milliseconds: 1200));
       if (hasTicks && autoTicks && _grid[y][x] == StatusBrick.star) {
         autoTicker(y, x);
       }
