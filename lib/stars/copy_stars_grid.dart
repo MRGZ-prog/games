@@ -3,8 +3,8 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:games/queens/stars_brick.dart';
-import 'package:games/queens/stars_solver.dart';
+import 'package:games/stars/stars_brick.dart';
+import 'package:games/stars/stars_solver.dart';
 
 class StarsGrid extends StatefulWidget {
   final int initGridSize;

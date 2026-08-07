@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:games/light_out/light_out_grid.dart';
-import 'package:games/queens/stars_grid.dart';
+import 'package:games/stars/stars_grid.dart';
 
 class MenuPage extends StatelessWidget {
   const MenuPage({super.key});
