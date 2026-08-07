@@ -614,6 +614,7 @@ class _StarsGridState extends State<StarsGrid> {
   // Timer
   // Share puzzle id
   // Choose difficulty
+  // Mark stars as red when in conflict
 
   @override
   Widget build(BuildContext context) {
@@ -646,27 +647,61 @@ class _StarsGridState extends State<StarsGrid> {
           children: [
             Padding(
               padding: const EdgeInsets.symmetric(
-                vertical: 12.0,
-                horizontal: 16.0,
+                vertical: 6.0,
+                horizontal: 6.0,
               ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  Text(
-                    "Size : ${gridSize}x$gridSize",
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      Text(
+                        "Size : ${gridSize}x$gridSize",
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        status,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text("Gen #$_generationId"),
+                    ],
                   ),
-                  Text(
-                    status,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  TextButton(
+                    onPressed: () {
+                      showDialog<String>(
+                        context: context,
+                        builder: (BuildContext context) => AlertDialog(
+                          title: const Text('Rules'),
+                          content: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Place EXACTLY ONE star in every column, row and color zone!',
+                              ),
+                              const Text(
+                                'Stars cannot touch each other, even diagonally.',
+                              ),
+                            ],
+                          ),
+                          actions: <Widget>[
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, 'OK'),
+                              child: const Text('OK'),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                    child: Text("Rules"),
                   ),
-                  Text("Gen #$_generationId"),
                 ],
               ),
             ),
